@@ -770,6 +770,20 @@ async function loadFloorImageForView(floorId) {
 		img.draggable = false;             
         wrapper.appendChild(img);
 
+        const scaleDisplay = document.createElement('div');
+        scaleDisplay.id = 'drawingScale';
+        scaleDisplay.style.position = 'absolute';
+        scaleDisplay.style.top = '10px';
+        scaleDisplay.style.left = '10px';
+        scaleDisplay.style.zIndex = '1000';
+        scaleDisplay.style.fontSize = '14px';
+        scaleDisplay.style.fontWeight = 'bold';
+        scaleDisplay.style.background = 'transparent';
+        scaleDisplay.style.color = '#000';
+        scaleDisplay.style.pointerEvents = 'none';
+        scaleDisplay.innerHTML = '1:<span id="scaleValue">100</span>';
+        content.appendChild(scaleDisplay);
+
         // Линейка
         const ruler = document.createElement('div');
         ruler.style.position = 'absolute';
@@ -822,19 +836,6 @@ async function loadFloorImageForView(floorId) {
         lengthDisplay.style.fontFamily = 'Arial, sans-serif';
         lengthDisplay.style.zIndex = '1000';
         wrapper.appendChild(lengthDisplay);
-
-        const scaleDisplay = document.createElement('div');
-        scaleDisplay.id = 'drawingScale';
-        scaleDisplay.style.position = 'absolute';
-        scaleDisplay.style.top = '10px';
-        scaleDisplay.style.left = '10px';
-        scaleDisplay.style.background = 'rgba(255,255,255,0.8)';
-        scaleDisplay.style.padding = '5px';
-        scaleDisplay.style.borderRadius = '3px';
-        scaleDisplay.style.zIndex = '1000';
-        scaleDisplay.style.fontFamily = 'Arial, sans-serif';
-        scaleDisplay.innerHTML = 'Масштаб чертежа: <span id="scaleValue">1:100</span>';
-        wrapper.appendChild(scaleDisplay);
 
 		const content = document.createElement('div');
 		content.style.position = 'absolute';
@@ -894,6 +895,16 @@ async function loadFloorImageForView(floorId) {
 		let pointA = { x: 100, y: 100 };
 		let pointB = { x: 200, y: 150 };
 		pixelsPerMeter = 62; // Примерная шкала (попробуй под себя подогнать)
+        
+        const updateScaleDisplay = () => {
+            const scaleValueEl = document.getElementById('scaleValue');
+            if (!scaleValueEl) return;
+        
+            const metersPerPixel = 1 / pixelsPerMeter;
+            const drawingScale = Math.round(1 / (metersPerPixel * currentZoom));
+            scaleValueEl.textContent = drawingScale;
+        };
+
 
 		// 2. Создание ручек, линии и метки
 		const createHandle = (x, y) => {
@@ -975,7 +986,7 @@ async function loadFloorImageForView(floorId) {
                     matchEl.textContent = '—';
                 }
             }
-
+            updateScaleDisplay();
 		}
 
         document.getElementById('actualLengthInput')?.addEventListener('input', updateRulerVisual);
@@ -1097,6 +1108,9 @@ async function loadFloorImageForView(floorId) {
             window.posX = mouseX - (mouseX - window.posX) * (window.currentZoom / oldZoom);
             window.posY = mouseY - (mouseY - window.posY) * (window.currentZoom / oldZoom);
 
+            const updateTransform = () => {
+                content.style.transform = `translate(${posX}px, ${posY}px) scale(${currentZoom})`;
+            }
             updateTransform();
             updateScaleDisplay();
         });

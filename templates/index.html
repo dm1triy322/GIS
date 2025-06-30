@@ -229,10 +229,18 @@
 			box-shadow: 0 0 5px rgba(0,0,0,0.3);
 		}
 		#drawingScale {
-			font-size: 14px;
-			font-weight: bold;
-			box-shadow: 0 0 5px rgba(0,0,0,0.3);
+		    font-size: 14px;
+		    font-weight: bold;
+			background: transparent;
+			border: none;
+			box-shadow: none;
+			padding: 0;
+			color: black;
+			z-index: 1000;
+			pointer-events: none;
 		}
+
+
     </style>
 </head>
 <body>
@@ -256,8 +264,6 @@
                     <div id="floorImageContainer" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center;">
                         <p>Выберите этаж для просмотра</p>
                     </div>
-					<div id="drawingScale" style="position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,0.8); padding: 5px; border-radius: 3px; z-index: 1000; font-family: Arial, sans-serif;">
-						Масштаб чертежа: <span id="scaleValue">1:100</span>
 					</div>
                 </div>
             </div>

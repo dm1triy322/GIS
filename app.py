@@ -4,7 +4,7 @@ from pdf2image import convert_from_path
 from flask import make_response
 
 import os
-import re  
+import re
 import pyproj
 import pymysql
 import json
@@ -15,15 +15,15 @@ from pyproj import Transformer
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
-UPLOAD_FOLDER = os.path.join(app.static_folder, 'buildings')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)    
-#PDF_FOLDER = r"C:\Users\user\Desktop\БЗ\TZ"
-#JSON_FILE = "shapes.json"
-#POPPLER_PATH = r"C:\Users\user\Desktop\БЗ\TZ\venv\Lib\site-packages\poppler-24.08.0\Library\bin"
-#PNG_PAGES_FOLDER = r"C:\Users\user\Desktop\БЗ\TZ\корп 42_pages"
+UPLOAD_FOLDER = os.path.join(app.static_folder, "buildings")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# PDF_FOLDER = r"C:\Users\user\Desktop\БЗ\TZ"
+# JSON_FILE = "shapes.json"
+# POPPLER_PATH = r"C:\Users\user\Desktop\БЗ\TZ\venv\Lib\site-packages\poppler-24.08.0\Library\bin"
+# PNG_PAGES_FOLDER = r"C:\Users\user\Desktop\БЗ\TZ\корп 42_pages"
 
 PDF_FOLDER = r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ"
-JSON_FILE = "shapes.json"  
+JSON_FILE = "shapes.json"
 POPPLER_PATH = r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\venv\Lib\site-packages\poppler-24.08.0\Library\bin"
 PNG_PAGES_FOLDER = r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\корп 42_pages"
 
@@ -31,12 +31,14 @@ DB_CONFIG = {
     "host": "localhost",
     "user": "root",
     "password": "Bds2121795!7559",
-    "database": "shapes_db"
+    "database": "shapes_db",
 }
+
 
 @app.route("/png_pages/<path:filename>")
 def serve_png_page(filename):
     return send_from_directory(PNG_PAGES_FOLDER, filename)
+
 
 @app.route("/get_building_pages/<building_name>")
 def get_building_pages(building_name):
@@ -51,15 +53,15 @@ def get_building_pages(building_name):
     ]
     return jsonify({"pages": pngs})
 
+
 @app.route("/get_pages_list", methods=["GET"])
 def get_pages_list():
     pages_dir = os.path.join(PDF_FOLDER, "корп 42_pages")
     if not os.path.exists(pages_dir):
         return jsonify({"pages": []})
-    
+
     pngs = [f for f in os.listdir(pages_dir) if f.endswith(".png")]
     return jsonify({"pages": pngs})
-
 
 
 @app.route("/save_building", methods=["POST"])
@@ -72,12 +74,17 @@ def save_building():
     os.makedirs(building_path, exist_ok=True)
 
     for file in selected_files:
-        src = os.path.join(app.static_folder, 'pages', file)
+        src = os.path.join(app.static_folder, "pages", file)
         dst = os.path.join(building_path, file)
         if os.path.exists(src):
             shutil.copy(src, dst)
 
-    return jsonify({"message": f"{building_name} сохранено", "path": f"/static/buildings/{building_name}"})
+    return jsonify(
+        {
+            "message": f"{building_name} сохранено",
+            "path": f"/static/buildings/{building_name}",
+        }
+    )
 
 
 @app.route("/list_buildings", methods=["GET"])
@@ -86,9 +93,15 @@ def list_buildings():
     for name in os.listdir(UPLOAD_FOLDER):
         b_path = os.path.join(UPLOAD_FOLDER, name)
         if os.path.isdir(b_path):
-            images = [f"/static/buildings/{name}/{img}" for img in os.listdir(b_path) if img.endswith(".png")]
+            images = [
+                f"/static/buildings/{name}/{img}"
+                for img in os.listdir(b_path)
+                if img.endswith(".png")
+            ]
             buildings.append({"name": name, "images": images})
     return jsonify(buildings)
+
+
 def get_db_connection():
     return pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
 
@@ -115,13 +128,15 @@ def import_json_to_mysql():
 
             coord_hash = hashlib.sha256(coordinates.encode()).hexdigest()
 
-            cursor.execute("SELECT COUNT(*) FROM shapes WHERE coord_hash = %s", (coord_hash,))
+            cursor.execute(
+                "SELECT COUNT(*) FROM shapes WHERE coord_hash = %s", (coord_hash,)
+            )
             exists = cursor.fetchone()["COUNT(*)"]
 
             if exists == 0:
                 cursor.execute(
                     "INSERT INTO shapes (uuid, shape_type, coordinates, coord_hash) VALUES (%s, %s, %s, %s)",
-                    (uuid_value, shape_type, coordinates, coord_hash)
+                    (uuid_value, shape_type, coordinates, coord_hash),
                 )
                 inserted_count += 1
 
@@ -134,22 +149,25 @@ def import_json_to_mysql():
     except Exception as e:
         print(f"Ошибка загрузки в MySQL: {e}")
 
+
 @app.route("/import_shapes", methods=["GET"])
 def import_shapes():
     import_json_to_mysql()
     return jsonify({"message": "Данные загружены в MySQL!"})
 
-import_json_to_mysql()  
+
+import_json_to_mysql()
+
 
 def print_shapes_from_db():
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute("SELECT * FROM shapes")
         shapes = cursor.fetchall()
-    
+
     conn.close()
 
-    print("\nТаблица MySQL: shapes (Все фигуры)\n" + "="*50)
+    print("\nТаблица MySQL: shapes (Все фигуры)\n" + "=" * 50)
     if not shapes:
         print("Таблица пустая!")
         return
@@ -161,11 +179,12 @@ def print_shapes_from_db():
         print(f"Дата создания: {row['created_at']}")
         print("-" * 50)
 
+
 @app.route("/create_building", methods=["POST"])
 def create_building():
     data = request.json
     name = data.get("name")
-    floors = data.get("floors")  
+    floors = data.get("floors")
 
     if not name or not floors:
         return jsonify({"error": "Имя и этажи обязательны"}), 400
@@ -173,7 +192,7 @@ def create_building():
     new_building = {
         "uuid": str(uuid.uuid4()),
         "name": name,
-        "floors": {str(f): {"coords": [], "confirmed": False} for f in floors}
+        "floors": {str(f): {"coords": [], "confirmed": False} for f in floors},
     }
 
     buildings = []
@@ -188,32 +207,36 @@ def create_building():
 
     return jsonify({"message": "Здание создано", "uuid": new_building["uuid"]})
 
+
 # Функция логирования координат
 def print_coords_step(step, coords):
     print(f"\n{step}:")
     for i, (x, y) in enumerate(coords):
         print(f"{i + 1}: X={x}, Y={y}")
 
+
 # Функция конвертации координат (НЕ меняем lat, lon!)
 def convert_coords(coords, source_crs, target_crs):
     transformer = Transformer.from_proj(source_crs, target_crs, always_xy=True)
     converted_coords = []
-    
+
     for x, y in coords:
-        lat, lon = transformer.transform(y, x)  
-        converted_coords.append([lon, lat])  
-    
-    print_coords_step("Конвертированные координаты", converted_coords)  
+        lat, lon = transformer.transform(y, x)
+        converted_coords.append([lon, lat])
+
+    print_coords_step("Конвертированные координаты", converted_coords)
     return converted_coords
-	# Функция извлечения координат из 8 и 9 страниц PDF
+
+
+# Функция извлечения координат из 8 и 9 страниц PDF
 def extract_coords(fname):
-    print('extracting from', fname)
+    print("extracting from", fname)
     reader = PdfReader(fname)
     print(len(reader.pages))
 
-    rez_podz = open(fname[:-4] + '_Подземный.txt', 'w')
-    rez_naz = open(fname[:-4] + '_Наземный.txt', 'w')
-    rez_nadz = open(fname[:-4] + '_Надземный.txt', 'w')
+    rez_podz = open(fname[:-4] + "_Подземный.txt", "w")
+    rez_naz = open(fname[:-4] + "_Наземный.txt", "w")
+    rez_nadz = open(fname[:-4] + "_Надземный.txt", "w")
 
     coords_yes = False
     for page in reader.pages:
@@ -228,10 +251,10 @@ def extract_coords(fname):
     rez_podz.close()
     rez_naz.close()
     rez_nadz.close()
-    print('extracting complete')
+    print("extracting complete")
 
 
-#Эта функция должна быть вне 'extract_coords'
+# Эта функция должна быть вне 'extract_coords'
 def save_pdf_pages_as_png(pdf_path):
     print(f"Конвертируем страницы {pdf_path} в PNG...")
 
@@ -245,7 +268,7 @@ def save_pdf_pages_as_png(pdf_path):
         images = convert_from_path(
             pdf_path,
             dpi=300,
-            poppler_path=r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\venv\Lib\site-packages\poppler-24.08.0\Library\bin"  
+            poppler_path=r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\venv\Lib\site-packages\poppler-24.08.0\Library\bin",
         )
         for i, image in enumerate(images):
             img_path = os.path.join(output_dir, f"page_{i + 1}.png")
@@ -255,35 +278,33 @@ def save_pdf_pages_as_png(pdf_path):
         print(f"Ошибка при конвертации PDF в PNG: {e}")
 
 
-
-
 def find_start_index(pt):
-    ind1 = pt.find('Внешний контур')
+    ind1 = pt.find("Внешний контур")
     if ind1 != -1:
         return ind1 + 15
-    ind2 = pt.find('1.1. Сведения о характерных точках контура объекта недвижимости')
+    ind2 = pt.find("1.1. Сведения о характерных точках контура объекта недвижимости")
     if ind2 != -1:
         return ind2 + 63
     return 0
 
 
 def extract_coordinates(pt, rez_podz, rez_naz, rez_nadz):
-    while any(keyword in pt for keyword in ['Подземный', 'Наземный', 'Надземный']):
+    while any(keyword in pt for keyword in ["Подземный", "Наземный", "Надземный"]):
         x, y, pt = extract_xy(pt)
-        if 'Подземный' in pt:
+        if "Подземный" in pt:
             rez_podz.write(f"{x}, {y}\n")
-        elif 'Наземный' in pt:
+        elif "Наземный" in pt:
             rez_naz.write(f"{x}, {y}\n")
-        elif 'Надземный' in pt:
+        elif "Надземный" in pt:
             rez_nadz.write(f"{x}, {y}\n")
 
 
 def extract_xy(pt):
-    x_ind = find_first_index(pt, ['580', '581', '579', '578', '577'])
-    y_ind = find_first_index(pt, ['217', '218', '216'])
-    x = pt[x_ind: x_ind + 9].replace(' ','')
-    y = pt[y_ind: y_ind + 10].replace(' ','')
-    pt = pt[max(x_ind + 9, y_ind + 10, pt.index('\n')):]
+    x_ind = find_first_index(pt, ["580", "581", "579", "578", "577"])
+    y_ind = find_first_index(pt, ["217", "218", "216"])
+    x = pt[x_ind : x_ind + 9].replace(" ", "")
+    y = pt[y_ind : y_ind + 10].replace(" ", "")
+    pt = pt[max(x_ind + 9, y_ind + 10, pt.index("\n")) :]
     return x, y, pt
 
 
@@ -294,13 +315,12 @@ def find_first_index(pt, options):
     return -1
 
 
-
-#Функция загрузки сохранённых фигур из JSON
+# Функция загрузки сохранённых фигур из JSON
 def load_shapes_from_json():
     if not os.path.exists(JSON_FILE):
         print("⚠ Файл shapes.json не найден. Загружаем пустые данные.")
         return {"shapes": []}
-    
+
     try:
         with open(JSON_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -310,7 +330,8 @@ def load_shapes_from_json():
         print(f"Ошибка при загрузке JSON: {e}")
         return {"shapes": []}
 
-#Загрузка фигур из JSON
+
+# Загрузка фигур из JSON
 @app.route("/load_shapes", methods=["GET"])
 def load_shapes():
     try:
@@ -323,8 +344,7 @@ def load_shapes():
         return jsonify({"shapes": []})
 
 
-
-#Сохранение фигур в JSON (перезапись)
+# Сохранение фигур в JSON (перезапись)
 @app.route("/save_shapes", methods=["POST"])
 def save_shapes():
     try:
@@ -351,12 +371,14 @@ def list_pdfs():
     pdf_files = [f for f in os.listdir(PDF_FOLDER) if f.endswith(".pdf")]
     return jsonify({"pdfs": pdf_files})
 
+
 def save_pdf_pages_as_png(pdf_path, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     images = convert_from_path(pdf_path, poppler_path=POPPLER_PATH)
     for i, image in enumerate(images):
         image.save(os.path.join(output_dir, f"page_{i + 1}.png"), "PNG")
+
 
 @app.route("/load_pdf", methods=["POST"])
 def load_pdf():
@@ -374,50 +396,54 @@ def load_pdf():
     png_output_dir = os.path.join(PDF_FOLDER, f"{os.path.splitext(filename)[0]}_pages")
     save_pdf_pages_as_png(pdf_path, png_output_dir)
 
-    return jsonify({
-        "message": f"{filename} загружен и конвертирован",
-        "pages_dir": png_output_dir
-    })
-    
+    return jsonify(
+        {"message": f"{filename} загружен и конвертирован", "pages_dir": png_output_dir}
+    )
+
+
 @app.route("/get_floor_images", methods=["GET"])
 def get_floor_images():
-    floor = request.args.get('floor', '0')
+    floor = request.args.get("floor", "0")
     print(f"Запрос изображений для этажа: {floor}")
-    
+
     if not os.path.exists(PNG_PAGES_FOLDER):
         print(f"Ошибка: директория {PNG_PAGES_FOLDER} не найдена")
         return jsonify({"error": "Директория не найдена", "images": []})
-    
+
     try:
-        all_images = sorted([f for f in os.listdir(PNG_PAGES_FOLDER) if f.endswith('.png')])
+        all_images = sorted(
+            [f for f in os.listdir(PNG_PAGES_FOLDER) if f.endswith(".png")]
+        )
         print(f"Найдено изображений: {all_images}")
-        
+
         images_list = [f"/get_png_image?file={img}" for img in all_images]
         return jsonify({"images": images_list, "floor": floor, "status": "success"})
-        
+
     except Exception as e:
         print(f"Ошибка: {str(e)}")
         return jsonify({"error": str(e), "status": "error"}), 500
 
-@app.route('/get_png_image', methods=['GET'])
+
+@app.route("/get_png_image", methods=["GET"])
 def get_png_image():
-    filename = request.args.get('file')
+    filename = request.args.get("file")
     if not filename:
         return jsonify({"error": "Не указано имя файла"}), 400
-    
+
     try:
-        if '..' in filename or filename.startswith('/'):
+        if ".." in filename or filename.startswith("/"):
             return jsonify({"error": "Недопустимое имя файла"}), 400
-            
+
         image_path = os.path.join(PNG_PAGES_FOLDER, filename)
-        
+
         if not os.path.exists(image_path):
             return jsonify({"error": "Файл не найден"}), 404
-            
-        return send_from_directory(PNG_PAGES_FOLDER, filename, mimetype='image/png')
-    
+
+        return send_from_directory(PNG_PAGES_FOLDER, filename, mimetype="image/png")
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/get_floors_list")
 def get_floors_list():
@@ -427,14 +453,13 @@ def get_floors_list():
         return jsonify(floors)
     except Exception as e:
         return jsonify([])
+
+
 @app.route("/add_floor", methods=["POST"])
 @app.route("/add_floor", methods=["POST"])
 def add_floor():
     data = request.get_json()
-    new_floor = {
-        "id": int(data.get("id")),
-        "name": data.get("name")
-    }
+    new_floor = {"id": int(data.get("id")), "name": data.get("name")}
 
     path = "floors.json"
     floors = []
@@ -455,21 +480,20 @@ def add_floor():
     return jsonify({"success": True, "message": "Этаж добавлен"})
 
 
-
-
 # 2. Получение списка PNG файлов
-@app.route('/get_png_list', methods=['GET'])
+@app.route("/get_png_list", methods=["GET"])
 def get_png_list():
     png_dir = r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\корп 42_pages"
     if os.path.exists(png_dir):
-        png_files = [f for f in os.listdir(png_dir) if f.lower().endswith('.png')]
+        png_files = [f for f in os.listdir(png_dir) if f.lower().endswith(".png")]
         return jsonify(png_files)
     return jsonify([])
 
+
 # 3. Получение изображения для этажа
-@app.route('/get_floor_image', methods=['GET'])
+@app.route("/get_floor_image", methods=["GET"])
 def get_floor_image():
-    floor_id = str(request.args.get('floor_id'))
+    floor_id = str(request.args.get("floor_id"))
     mapping_file = "floor_png_map.json"
 
     if not os.path.exists(mapping_file):
@@ -483,23 +507,23 @@ def get_floor_image():
 
 
 # 4. Сохранение PNG для этажа
-@app.route('/save_floor_png', methods=['POST'])
+@app.route("/save_floor_png", methods=["POST"])
 def save_floor_png():
     data = request.get_json()
-    floor_id = data.get('floor_id')
-    png_file = data.get('png_file')
-    
+    floor_id = data.get("floor_id")
+    png_file = data.get("png_file")
 
-    
     return jsonify({"success": True, "message": "PNG сохранен для этажа"})
+
 
 @app.route("/get_available_pngs", methods=["GET"])
 def get_available_pngs():
     png_dir = r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\корп 42_pages"
     if os.path.exists(png_dir):
-        pngs = [f for f in os.listdir(png_dir) if f.lower().endswith('.png')]
+        pngs = [f for f in os.listdir(png_dir) if f.lower().endswith(".png")]
         return jsonify({"pngs": pngs})
     return jsonify({"pngs": []})
+
 
 @app.route("/attach_png_to_floor", methods=["POST"])
 def attach_png_to_floor():
@@ -519,17 +543,25 @@ def attach_png_to_floor():
     with open(mapping_file, "w", encoding="utf-8") as f:
         json.dump(mappings, f, indent=2, ensure_ascii=False)
 
-    return jsonify({"success": True, "message": f"Изображение {png_name} прикреплено к этажу {floor_id}"})
+    return jsonify(
+        {
+            "success": True,
+            "message": f"Изображение {png_name} прикреплено к этажу {floor_id}",
+        }
+    )
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/static/<path:filename>")
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
+
 if __name__ == "__main__":
     app.run(debug=True)
 
-print_shapes_from_db() 
+print_shapes_from_db()
