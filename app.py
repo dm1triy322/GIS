@@ -105,6 +105,115 @@ def list_buildings():
 def get_db_connection():
     return pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
 
+def create_database_if_not_exists():
+    config = DB_CONFIG.copy()
+    db_name = config.pop("database")
+    conn = pymysql.connect(**config)
+    with conn.cursor() as cursor:
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+    conn.commit()
+    conn.close()
+    print(f"✅ База данных `{db_name}` создана.")
+
+
+
+
+def init_buildings_table():
+    connection = get_db_connection()
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS buildings (
+                uuid VARCHAR(255) PRIMARY KEY,
+                points JSON,
+                coordinates JSON,
+                plan_info JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+    connection.commit()
+    connection.close()
+    print("✅ Таблица `buildings` обновлена.")
+
+
+
+def insert_building(uuid_value, points_data, coords, plan_info=None):
+    connection = get_db_connection()
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO buildings (uuid, points, coordinates, plan_info)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                points = VALUES(points),
+                coordinates = VALUES(coordinates),
+                plan_info = VALUES(plan_info)
+        """, (
+            uuid_value,
+            json.dumps(points_data, ensure_ascii=False),
+            json.dumps(coords),
+            json.dumps(plan_info) if plan_info else None
+        ))
+    connection.commit()
+    connection.close()
+    print(f"✅ Расширенное здание {uuid_value} сохранено.")
+
+
+def extract_building_name_from_pdf(pdf_path):
+    reader = PdfReader(pdf_path)
+    full_text = ""
+    for page in reader.pages:
+        page_text = page.extract_text()
+        full_text += page_text + "\n"
+
+
+    match = re.search(r"Наименование объекта недвижимости\s+([^\n\r]+)", full_text)
+    if match:
+        name = match.group(1).strip()
+        print(f" Название корпуса найдено: {name}")
+        return name
+    else:
+        print(" Имя корпуса не найдено.")
+        return "Неизвестный"
+
+
+def load_shapes_into_buildings_table(pdf_path):
+    if not os.path.exists(JSON_FILE):
+        print("⚠ shapes.json не найден.")
+        return
+
+    with open(JSON_FILE, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    shapes = data.get("shapes", [])
+    if not shapes:
+        print("⚠ Нет фигур для загрузки.")
+        return
+
+    building_name = extract_building_name_from_pdf(pdf_path)
+
+    for shape in shapes:
+        uuid_val = shape.get("uuid")
+        coords = shape.get("coords", [])
+        if not uuid_val or not coords:
+            continue
+
+        insert_building(uuid_val, building_name, coords)
+
+
+def insert_or_update_building(uuid_value, coords, floors_count):
+    connection = get_db_connection()
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO buildings (uuid, coordinates, floors_count)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE coordinates = VALUES(coordinates), floors_count = VALUES(floors_count)
+        """,
+            (uuid_value, json.dumps(coords), floors_count),
+        )
+    connection.commit()
+    connection.close()
+    print(f"✅ Здание {uuid_value} сохранено в базе.")
+
 
 def import_json_to_mysql():
     try:
@@ -560,8 +669,20 @@ def index():
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
+#if __name__ == "__main__": # тоже нужно для создания таблицы(работает с def create_database_if_not_exists():)
+    create_database_if_not_exists()
+    init_buildings_table()
+    load_shapes_into_buildings_table()
+    app.run(debug=True)
+
 
 if __name__ == "__main__":
+    create_database_if_not_exists()
+    init_buildings_table()
+    load_shapes_into_buildings_table(r"C:\Users\dmitriy.beglov\Desktop\БЗ\TZ\корп 42.pdf")
     app.run(debug=True)
+
+
+
 
 print_shapes_from_db()
